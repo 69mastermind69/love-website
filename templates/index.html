@@ -42,6 +42,7 @@
                 #fff0f6;
         }
 
+
         /* Floating hearts */
 
         .heart {
@@ -57,6 +58,7 @@
 
             pointer-events: none;
         }
+
 
         @keyframes floatUp {
 
@@ -267,7 +269,9 @@
 
             position: relative;
 
-            transition: left 0.15s, top 0.15s;
+            transition:
+                left 0.15s,
+                top 0.15s;
         }
 
 
@@ -294,6 +298,30 @@
         }
 
 
+        /* Powered by */
+
+        .powered-by {
+
+            position: fixed;
+
+            bottom: 10px;
+
+            left: 0;
+
+            width: 100%;
+
+            text-align: center;
+
+            font-size: 13px;
+
+            color: #888;
+
+            z-index: 20;
+
+            pointer-events: none;
+        }
+
+
         /* Mobile */
 
         @media (max-width: 500px) {
@@ -314,10 +342,18 @@
             }
 
             button {
+
                 font-size: 16px;
 
                 padding:
                     12px 20px;
+            }
+
+            .powered-by {
+
+                font-size: 12px;
+
+                bottom: 7px;
             }
         }
 
@@ -396,6 +432,13 @@
     </div>
 
 
+    <!-- Powered by -->
+
+    <div class="powered-by">
+        Powered by Do_x_Die
+    </div>
+
+
 
 <script>
 
@@ -405,6 +448,8 @@
     let birthday = "";
 
     let favouriteColor = "";
+
+    let loveAnswer = "";
 
 
 
@@ -457,6 +502,7 @@
                 id="name"
                 type="text"
                 placeholder="Type your name..."
+                maxlength="100"
             >
 
 
@@ -618,6 +664,7 @@
                 id="color"
                 type="text"
                 placeholder="Your favourite color..."
+                maxlength="100"
             >
 
 
@@ -704,7 +751,10 @@
                 </button>
 
 
-                <button id="noButton">
+                <button
+                    id="noButton"
+                    type="button"
+                >
 
                     NO 😏
 
@@ -762,9 +812,12 @@
             document.getElementById("noButton");
 
 
-        /*
-            Random position
-        */
+        if (!noButton) {
+
+            return;
+
+        }
+
 
         const x =
             Math.random() * 220 - 110;
@@ -794,6 +847,9 @@
     ========================= */
 
     function yesAnswer() {
+
+        loveAnswer = "YES";
+
 
         document.getElementById("app").innerHTML = `
 
@@ -869,8 +925,6 @@
             >
 
 
-                <!-- Name -->
-
                 <input
                     type="hidden"
                     name="name"
@@ -878,16 +932,12 @@
                 >
 
 
-                <!-- Birthday -->
-
                 <input
                     type="hidden"
                     name="birthday"
-                    value="${birthday}"
+                    value="${escapeHtml(birthday)}"
                 >
 
-
-                <!-- Favourite Color -->
 
                 <input
                     type="hidden"
@@ -896,12 +946,18 @@
                 >
 
 
-                <!-- Message -->
+                <input
+                    type="hidden"
+                    name="love_answer"
+                    value="${escapeHtml(loveAnswer)}"
+                >
+
 
                 <input
                     name="message"
                     type="text"
                     placeholder="Write something..."
+                    maxlength="1000"
                     required
                 >
 
