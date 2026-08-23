@@ -5,9 +5,9 @@ import psycopg
 app = Flask(__name__)
 
 
-# --------------------------------
-# Database connection
-# --------------------------------
+# =========================================================
+# DATABASE URL
+# =========================================================
 
 def get_database_url():
     database_url = os.environ.get("DATABASE_URL")
@@ -17,8 +17,7 @@ def get_database_url():
             "DATABASE_URL environment variable is not set."
         )
 
-    # Some PostgreSQL URLs may use postgres://
-    # psycopg expects postgresql://
+    # Convert old postgres:// format if necessary
     if database_url.startswith("postgres://"):
         database_url = database_url.replace(
             "postgres://",
@@ -29,13 +28,19 @@ def get_database_url():
     return database_url
 
 
+# =========================================================
+# DATABASE CONNECTION
+# =========================================================
+
 def get_connection():
-    return psycopg.connect(get_database_url())
+    return psycopg.connect(
+        get_database_url()
+    )
 
 
-# --------------------------------
-# Create database table
-# --------------------------------
+# =========================================================
+# CREATE TABLE
+# =========================================================
 
 def init_database():
 
@@ -46,34 +51,74 @@ def init_database():
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS responses (
                     id SERIAL PRIMARY KEY,
+
                     name TEXT NOT NULL,
+
                     birthday TEXT,
+
                     favorite_color TEXT,
+
                     love_answer TEXT,
+
                     message TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+                    created_at TIMESTAMP
+                        DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
         conn.commit()
 
 
-# --------------------------------
-# Home page
-# --------------------------------
+# =========================================================
+# INITIALIZE DATABASE
+# =========================================================
+
+# Render uses:
+# gunicorn app:app
+#
+# Therefore __main__ is not executed.
+# So we initialize the database when this module loads.
+
+try:
+
+    init_database()
+
+    print("Database initialized successfully.")
+
+except Exception as e:
+
+    print(
+        "Database initialization failed:",
+        e
+    )
+
+
+# =========================================================
+# HOME
+# =========================================================
 
 @app.route("/")
 def home():
 
-    return render_template("index.html")
+    return render_template(
+        "index.html"
+    )
 
 
-# --------------------------------
-# Submit response
-# --------------------------------
+# =========================================================
+# SUBMIT RESPONSE
+# =========================================================
 
-@app.route("/submit", methods=["POST"])
+@app.route(
+    "/submit",
+    methods=["POST"]
+)
 def submit():
+
+    # -------------------------
+    # Get form data
+    # -------------------------
 
     name = request.form.get(
         "name",
@@ -90,13 +135,15 @@ def submit():
         ""
     ).strip()
 
-    # Supports either name for your existing form
     love_answer = request.form.get(
         "love_answer",
         ""
     ).strip()
 
+    # Support old form field name too
+
     if not love_answer:
+
         love_answer = request.form.get(
             "love",
             ""
@@ -108,178 +155,330 @@ def submit():
     ).strip()
 
 
-    # Name is required
+    # -------------------------
+    # Validate name
+    # -------------------------
+
     if not name:
 
-        return "Name is required.", 400
+        return (
+            "Name is required.",
+            400
+        )
 
 
+    # -------------------------
     # Save to PostgreSQL
-    with get_connection() as conn:
+    # -------------------------
 
-        with conn.cursor() as cur:
+    try:
 
-            cur.execute(
-                """
-                INSERT INTO responses
-                (
-                    name,
-                    birthday,
-                    favorite_color,
-                    love_answer,
-                    message
+        with get_connection() as conn:
+
+            with conn.cursor() as cur:
+
+                cur.execute(
+                    """
+                    INSERT INTO responses
+                    (
+                        name,
+                        birthday,
+                        favorite_color,
+                        love_answer,
+                        message
+                    )
+                    VALUES
+                    (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s
+                    )
+                    """,
+
+                    (
+                        name,
+                        birthday,
+                        favorite_color,
+                        love_answer,
+                        message
+                    )
                 )
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (
-                    name,
-                    birthday,
-                    favorite_color,
-                    love_answer,
-                    message
-                )
-            )
 
-        conn.commit()
+            conn.commit()
 
+
+    except Exception as e:
+
+        print(
+            "Error saving response:",
+            e
+        )
+
+        return (
+            "Sorry, there was a problem saving your response.",
+            500
+        )
+
+
+    # -------------------------
+    # Success
+    # -------------------------
 
     return redirect(
         url_for("thank_you")
     )
 
 
-# --------------------------------
-# Thank you page
-# --------------------------------
+# =========================================================
+# THANK YOU PAGE
+# =========================================================
 
 @app.route("/thank-you")
 def thank_you():
 
     return """
-    <!DOCTYPE html>
+<!DOCTYPE html>
 
-    <html>
+<html>
 
-    <head>
+<head>
 
-        <meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-        <meta name="viewport"
-              content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-        <title>Thank You 💗</title>
-
-        <style>
-
-            body {
-                margin: 0;
-                min-height: 100vh;
-
-                display: flex;
-                justify-content: center;
-                align-items: center;
-
-                text-align: center;
-
-                font-family: Arial, sans-serif;
-
-                background: #fff0f6;
-            }
-
-            .box {
-                width: 350px;
-                max-width: 85%;
-
-                background: white;
-
-                padding: 40px;
-
-                border-radius: 25px;
-
-                box-shadow:
-                    0 10px 30px
-                    rgba(0, 0, 0, 0.12);
-            }
-
-            h1 {
-                color: #ff4f87;
-            }
-
-            p {
-                color: #666;
-                font-size: 18px;
-            }
-
-        </style>
-
-    </head>
+    <title>Thank You 💗</title>
 
 
-    <body>
+    <style>
 
-        <div class="box">
+        * {
+            box-sizing: border-box;
+        }
 
-            <div style="font-size:70px;">
-                💗
-            </div>
+        body {
 
-            <h1>
-                Thank You!
-            </h1>
+            margin: 0;
 
-            <p>
-                Your response has been saved. 🥰
-            </p>
+            min-height: 100vh;
 
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            text-align: center;
+
+            font-family: Arial, sans-serif;
+
+            background: #fff0f6;
+        }
+
+
+        .box {
+
+            width: 350px;
+
+            max-width: 85%;
+
+            background: white;
+
+            padding: 40px;
+
+            border-radius: 25px;
+
+            box-shadow:
+                0 10px 30px
+                rgba(0, 0, 0, 0.12);
+        }
+
+
+        h1 {
+
+            color: #ff4f87;
+        }
+
+
+        p {
+
+            color: #666;
+
+            font-size: 18px;
+
+            line-height: 1.5;
+        }
+
+
+        .heart {
+
+            font-size: 70px;
+        }
+
+
+        .powered {
+
+            position: fixed;
+
+            bottom: 10px;
+
+            left: 0;
+
+            width: 100%;
+
+            text-align: center;
+
+            font-size: 12px;
+
+            color: #999;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <div class="box">
+
+        <div class="heart">
+            💗
         </div>
 
-    </body>
 
-    </html>
-    """
+        <h1>
+            Thank You!
+        </h1>
 
 
-# --------------------------------
-# Responses page
-# --------------------------------
+        <p>
+            Your response has been saved. 🥰
+        </p>
+
+    </div>
+
+
+    <div class="powered">
+        Powered by Do_x_Die
+    </div>
+
+
+</body>
+
+</html>
+"""
+
+
+# =========================================================
+# RESPONSES
+# =========================================================
 
 @app.route("/responses")
 def responses_page():
 
-    with get_connection() as conn:
+    try:
 
-        with conn.cursor() as cur:
+        with get_connection() as conn:
 
-            cur.execute("""
-                SELECT
-                    id,
-                    name,
-                    birthday,
-                    favorite_color,
-                    love_answer,
-                    message,
-                    created_at
-                FROM responses
-                ORDER BY id DESC
-            """)
+            with conn.cursor() as cur:
 
-            responses = cur.fetchall()
+                cur.execute("""
+                    SELECT
+                        id,
+                        name,
+                        birthday,
+                        favorite_color,
+                        love_answer,
+                        message,
+                        created_at
+                    FROM responses
+                    ORDER BY id DESC
+                """)
 
-
-    return render_template(
-        "responses.html",
-        responses=responses
-    )
+                responses = cur.fetchall()
 
 
-# --------------------------------
-# Start app
-# --------------------------------
+        return render_template(
+            "responses.html",
+            responses=responses
+        )
+
+
+    except Exception as e:
+
+        print(
+            "Error loading responses:",
+            e
+        )
+
+        return (
+            "Could not load responses. "
+            "Please check the database connection.",
+            500
+        )
+
+
+# =========================================================
+# HEALTH CHECK
+# =========================================================
+
+@app.route("/health")
+def health():
+
+    try:
+
+        with get_connection() as conn:
+
+            with conn.cursor() as cur:
+
+                cur.execute(
+                    "SELECT 1"
+                )
+
+                cur.fetchone()
+
+
+        return "OK", 200
+
+
+    except Exception as e:
+
+        print(
+            "Health check database error:",
+            e
+        )
+
+        return "Database error", 500
+
+
+# =========================================================
+# LOCAL DEVELOPMENT
+# =========================================================
 
 if __name__ == "__main__":
 
-    # Create table when running locally
-    init_database()
+    try:
+
+        init_database()
+
+        print(
+            "Database initialized successfully."
+        )
+
+    except Exception as e:
+
+        print(
+            "Database initialization failed:",
+            e
+        )
+
 
     app.run(
         host="0.0.0.0",
