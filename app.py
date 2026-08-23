@@ -1,91 +1,156 @@
 from flask import Flask, render_template, request, redirect, url_for
-import json
 import os
+import psycopg
 
 app = Flask(__name__)
 
-# Responses এই file-এ save হবে
-DATA_FILE = "responses.json"
 
+# --------------------------------
+# Database connection
+# --------------------------------
 
-def load_responses():
-    """Saved responses load করে।"""
+def get_database_url():
+    database_url = os.environ.get("DATABASE_URL")
 
-    if not os.path.exists(DATA_FILE):
-        return []
-
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as file:
-            return json.load(file)
-
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def save_responses(responses):
-    """Responses JSON file-এ save করে।"""
-
-    with open(DATA_FILE, "w", encoding="utf-8") as file:
-        json.dump(
-            responses,
-            file,
-            ensure_ascii=False,
-            indent=4
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable is not set."
         )
 
+    # Some PostgreSQL URLs may use postgres://
+    # psycopg expects postgresql://
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace(
+            "postgres://",
+            "postgresql://",
+            1
+        )
 
-# -------------------------
-# Main Website
-# -------------------------
+    return database_url
+
+
+def get_connection():
+    return psycopg.connect(get_database_url())
+
+
+# --------------------------------
+# Create database table
+# --------------------------------
+
+def init_database():
+
+    with get_connection() as conn:
+
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS responses (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    birthday TEXT,
+                    favorite_color TEXT,
+                    love_answer TEXT,
+                    message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+        conn.commit()
+
+
+# --------------------------------
+# Home page
+# --------------------------------
 
 @app.route("/")
 def home():
+
     return render_template("index.html")
 
 
-# -------------------------
-# Submit Response
-# -------------------------
+# --------------------------------
+# Submit response
+# --------------------------------
 
 @app.route("/submit", methods=["POST"])
 def submit():
 
-    name = request.form.get("name", "").strip()
-    birthday = request.form.get("birthday", "").strip()
+    name = request.form.get(
+        "name",
+        ""
+    ).strip()
+
+    birthday = request.form.get(
+        "birthday",
+        ""
+    ).strip()
+
     favorite_color = request.form.get(
         "favorite_color",
         ""
     ).strip()
-    message = request.form.get("message", "").strip()
 
-    # Name required
+    # Supports either name for your existing form
+    love_answer = request.form.get(
+        "love_answer",
+        ""
+    ).strip()
+
+    if not love_answer:
+        love_answer = request.form.get(
+            "love",
+            ""
+        ).strip()
+
+    message = request.form.get(
+        "message",
+        ""
+    ).strip()
+
+
+    # Name is required
     if not name:
+
         return "Name is required.", 400
 
-    # Response তৈরি
-    response = {
-        "name": name,
-        "birthday": birthday,
-        "favorite_color": favorite_color,
-        "message": message
-    }
 
-    # পুরোনো responses load
-    responses = load_responses()
+    # Save to PostgreSQL
+    with get_connection() as conn:
 
-    # নতুন response যোগ
-    responses.append(response)
+        with conn.cursor() as cur:
 
-    # Save
-    save_responses(responses)
+            cur.execute(
+                """
+                INSERT INTO responses
+                (
+                    name,
+                    birthday,
+                    favorite_color,
+                    love_answer,
+                    message
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    name,
+                    birthday,
+                    favorite_color,
+                    love_answer,
+                    message
+                )
+            )
 
-    # Thank-you page
-    return redirect(url_for("thank_you"))
+        conn.commit()
 
 
-# -------------------------
-# Thank You Page
-# -------------------------
+    return redirect(
+        url_for("thank_you")
+    )
+
+
+# --------------------------------
+# Thank you page
+# --------------------------------
 
 @app.route("/thank-you")
 def thank_you():
@@ -108,13 +173,10 @@ def thank_you():
 
             body {
                 margin: 0;
-
                 min-height: 100vh;
 
                 display: flex;
-
                 justify-content: center;
-
                 align-items: center;
 
                 text-align: center;
@@ -126,7 +188,6 @@ def thank_you():
 
             .box {
                 width: 350px;
-
                 max-width: 85%;
 
                 background: white;
@@ -146,7 +207,6 @@ def thank_you():
 
             p {
                 color: #666;
-
                 font-size: 18px;
             }
 
@@ -179,14 +239,32 @@ def thank_you():
     """
 
 
-# -------------------------
-# Private Responses Page
-# -------------------------
+# --------------------------------
+# Responses page
+# --------------------------------
 
 @app.route("/responses")
 def responses_page():
 
-    responses = load_responses()
+    with get_connection() as conn:
+
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                SELECT
+                    id,
+                    name,
+                    birthday,
+                    favorite_color,
+                    love_answer,
+                    message,
+                    created_at
+                FROM responses
+                ORDER BY id DESC
+            """)
+
+            responses = cur.fetchall()
+
 
     return render_template(
         "responses.html",
@@ -194,11 +272,14 @@ def responses_page():
     )
 
 
-# -------------------------
-# Run Locally
-# -------------------------
+# --------------------------------
+# Start app
+# --------------------------------
 
 if __name__ == "__main__":
+
+    # Create table when running locally
+    init_database()
 
     app.run(
         host="0.0.0.0",
