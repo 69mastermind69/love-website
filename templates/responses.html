@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Responses 💌</title>
+
+
+    <style>
+
+        body {
+
+            margin: 0;
+
+            padding: 30px;
+
+            font-family: Arial, sans-serif;
+
+            background: #fff0f6;
+
+            color: #444;
+        }
+
+
+        h1 {
+
+            text-align: center;
+
+            color: #ff4f87;
+        }
+
+
+        .response {
+
+            max-width: 500px;
+
+            margin: 20px auto;
+
+            padding: 25px;
+
+            background: white;
+
+            border-radius: 20px;
+
+            box-shadow:
+                0 8px 25px
+                rgba(0,0,0,0.1);
+        }
+
+
+        .response h2 {
+
+            color: #ff4f87;
+        }
+
+
+        .message {
+
+            background: #fff3f7;
+
+            padding: 15px;
+
+            border-radius: 12px;
+
+            margin-top: 10px;
+        }
+
+
+        .empty {
+
+            text-align: center;
+
+            margin-top: 50px;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <h1>
+        💌 Responses
+    </h1>
+
+
+    {% if responses %}
+
+
+        {% for response in responses %}
+
+            <div class="response">
+
+                <h2>
+                    {{ response.name }} 💗
+                </h2>
+
+
+                <p>
+
+                    <strong>
+                        Birthday:
+                    </strong>
+
+                    {{ response.birthday }}
+
+                </p>
+
+
+                <p>
+
+                    <strong>
+                        Favourite Color:
+                    </strong>
+
+                    {{ response.favorite_color }}
+
+                </p>
+
+
+                <div class="message">
+
+                    <strong>
+                        Message:
+                    </strong>
+
+                    <br><br>
+
+                    {{ response.message }}
+
+                </div>
+
+            </div>
+
+        {% endfor %}
+
+
+    {% else %}
+
+
+        <div class="empty">
+
+            <h2>
+                No responses yet 💭
+            </h2>
+
+            <p>
+                Someone's response will appear here
+                after they submit the form.
+            </p>
+
+        </div>
+
+
+    {% endif %}
+
+
+</body>
+
+</html>
