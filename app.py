@@ -33,13 +33,11 @@ def get_database_url():
 # =========================================================
 
 def get_connection():
-    return psycopg.connect(
-        get_database_url()
-    )
+    return psycopg.connect(get_database_url())
 
 
 # =========================================================
-# CREATE TABLE
+# CREATE / UPDATE TABLE
 # =========================================================
 
 def init_database():
@@ -58,6 +56,8 @@ def init_database():
 
                     favorite_color TEXT,
 
+                    dream TEXT,
+
                     love_answer TEXT,
 
                     message TEXT,
@@ -67,18 +67,19 @@ def init_database():
                 )
             """)
 
+            # If the table already existed before the dream question
+            # was added, add the new column without deleting old data.
+            cur.execute("""
+                ALTER TABLE responses
+                ADD COLUMN IF NOT EXISTS dream TEXT
+            """)
+
         conn.commit()
 
 
 # =========================================================
 # INITIALIZE DATABASE
 # =========================================================
-
-# Render uses:
-# gunicorn app:app
-#
-# Therefore __main__ is not executed.
-# So we initialize the database when this module loads.
 
 try:
 
@@ -88,10 +89,7 @@ try:
 
 except Exception as e:
 
-    print(
-        "Database initialization failed:",
-        e
-    )
+    print("Database initialization failed:", e)
 
 
 # =========================================================
@@ -101,19 +99,14 @@ except Exception as e:
 @app.route("/")
 def home():
 
-    return render_template(
-        "index.html"
-    )
+    return render_template("index.html")
 
 
 # =========================================================
 # SUBMIT RESPONSE
 # =========================================================
 
-@app.route(
-    "/submit",
-    methods=["POST"]
-)
+@app.route("/submit", methods=["POST"])
 def submit():
 
     # -------------------------
@@ -135,13 +128,18 @@ def submit():
         ""
     ).strip()
 
+    # NEW: Dream answer
+    dream = request.form.get(
+        "dream",
+        ""
+    ).strip()
+
     love_answer = request.form.get(
         "love_answer",
         ""
     ).strip()
 
     # Support old form field name too
-
     if not love_answer:
 
         love_answer = request.form.get(
@@ -184,11 +182,13 @@ def submit():
                         name,
                         birthday,
                         favorite_color,
+                        dream,
                         love_answer,
                         message
                     )
                     VALUES
                     (
+                        %s,
                         %s,
                         %s,
                         %s,
@@ -201,6 +201,7 @@ def submit():
                         name,
                         birthday,
                         favorite_color,
+                        dream,
                         love_answer,
                         message
                     )
@@ -254,7 +255,6 @@ def thank_you():
 
     <title>Thank You 💗</title>
 
-
     <style>
 
         * {
@@ -280,7 +280,6 @@ def thank_you():
             background: #fff0f6;
         }
 
-
         .box {
 
             width: 350px;
@@ -298,28 +297,19 @@ def thank_you():
                 rgba(0, 0, 0, 0.12);
         }
 
-
         h1 {
-
             color: #ff4f87;
         }
 
-
         p {
-
             color: #666;
-
             font-size: 18px;
-
             line-height: 1.5;
         }
 
-
         .heart {
-
             font-size: 70px;
         }
-
 
         .powered {
 
@@ -342,9 +332,7 @@ def thank_you():
 
 </head>
 
-
 <body>
-
 
     <div class="box">
 
@@ -352,11 +340,9 @@ def thank_you():
             💗
         </div>
 
-
         <h1>
             Thank You!
         </h1>
-
 
         <p>
             Your response has been saved. 🥰
@@ -364,11 +350,9 @@ def thank_you():
 
     </div>
 
-
     <div class="powered">
         Powered by Do_x_Die
     </div>
-
 
 </body>
 
@@ -395,6 +379,7 @@ def responses_page():
                         name,
                         birthday,
                         favorite_color,
+                        dream,
                         love_answer,
                         message,
                         created_at
@@ -438,9 +423,7 @@ def health():
 
             with conn.cursor() as cur:
 
-                cur.execute(
-                    "SELECT 1"
-                )
+                cur.execute("SELECT 1")
 
                 cur.fetchone()
 
